@@ -1,1 +1,0 @@
-document.querySelector("#main > div > div.row > div:nth-child(1) > form > div.form-inputs > div.form-group.text > label > img")
